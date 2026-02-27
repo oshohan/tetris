@@ -1,0 +1,45 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Decompress gz files
+        run: |
+          find Build -name "*.gz" | while read f; do
+            gunzip -k "$f"
+            mv "${f%.gz}" "${f%.gz}.ungz" 2>/dev/null || true
+          done
+          for f in Build/*.js.gz; do
+            gunzip -c "$f" > "${f%.gz}" 2>/dev/null || true
+          done
+          for f in Build/*.wasm.gz; do
+            gunzip -c "$f" > "${f%.gz}" 2>/dev/null || true
+          done
+          for f in Build/*.data.gz; do
+            gunzip -c "$f" > "${f%.gz}" 2>/dev/null || true
+          done
+
+      - name: Fix index.html
+        run: |
+          sed -i 's/\.js\.gz/\.js/g' index.html
+          sed -i 's/\.wasm\.gz/\.wasm/g' index.html
+          sed -i 's/\.data\.gz/\.data/g' index.html
+          sed -i 's/unityConfig\.codeUrl.*$/unityConfig.codeUrl = unityConfig.codeUrl.replace(".gz","");/g' index.html || true
+
+      - name: Deploy
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./
