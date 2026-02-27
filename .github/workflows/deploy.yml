@@ -1,38 +1,40 @@
-name: Deploy to GitHub Pages
+name: Fix and Deploy
 
 on:
   push:
     branches: [ main ]
-
-permissions:
-  contents: write
+    paths-ignore:
+      - '.github/**'
 
 jobs:
-  deploy:
+  fix:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Decompress and fix
+      - name: Decompress gz files
         run: |
           cd Build
           for f in *.gz; do
+            [ -f "$f" ] || continue
             out="${f%.gz}"
             gunzip -c "$f" > "$out"
+            rm "$f"
             echo "展開: $f -> $out"
           done
           ls -la
-          cd ..
-          # index.htmlの参照を.gzなしに変更
+
+      - name: Fix index.html
+        run: |
           sed -i 's/\.framework\.js\.gz/\.framework\.js/g' index.html
           sed -i 's/\.data\.gz/\.data/g' index.html
           sed -i 's/\.wasm\.gz/\.wasm/g' index.html
-          sed -i 's/\.loader\.js\.gz/\.loader\.js/g' index.html
-          cat index.html | grep -i "build"
+          grep -i "build" index.html
 
-      - name: Deploy
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./
-          keep_files: false
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add -A
+          git diff --staged --quiet || git commit -m "Decompress build files"
+          git push
