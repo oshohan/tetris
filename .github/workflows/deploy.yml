@@ -6,8 +6,6 @@ on:
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 jobs:
   deploy:
@@ -15,31 +13,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Decompress gz files
+      - name: Decompress and fix
         run: |
-          find Build -name "*.gz" | while read f; do
-            gunzip -k "$f"
-            mv "${f%.gz}" "${f%.gz}.ungz" 2>/dev/null || true
+          cd Build
+          for f in *.gz; do
+            out="${f%.gz}"
+            gunzip -c "$f" > "$out"
+            echo "展開: $f -> $out"
           done
-          for f in Build/*.js.gz; do
-            gunzip -c "$f" > "${f%.gz}" 2>/dev/null || true
-          done
-          for f in Build/*.wasm.gz; do
-            gunzip -c "$f" > "${f%.gz}" 2>/dev/null || true
-          done
-          for f in Build/*.data.gz; do
-            gunzip -c "$f" > "${f%.gz}" 2>/dev/null || true
-          done
-
-      - name: Fix index.html
-        run: |
-          sed -i 's/\.js\.gz/\.js/g' index.html
-          sed -i 's/\.wasm\.gz/\.wasm/g' index.html
+          ls -la
+          cd ..
+          # index.htmlの参照を.gzなしに変更
+          sed -i 's/\.framework\.js\.gz/\.framework\.js/g' index.html
           sed -i 's/\.data\.gz/\.data/g' index.html
-          sed -i 's/unityConfig\.codeUrl.*$/unityConfig.codeUrl = unityConfig.codeUrl.replace(".gz","");/g' index.html || true
+          sed -i 's/\.wasm\.gz/\.wasm/g' index.html
+          sed -i 's/\.loader\.js\.gz/\.loader\.js/g' index.html
+          cat index.html | grep -i "build"
 
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./
+          keep_files: false
